@@ -1,0 +1,260 @@
+<html>
+    <head>
+        <style>
+            html {
+            }
+
+            body {
+                margin: 0;
+                overflow: hidden;
+            }
+
+            .header {
+                background-color: #f1f1f1;
+                padding: 10px;
+                text-align: center;
+            }
+            
+            .column {
+                float: left;
+            }
+
+            .column.side {
+                width: 20%;
+                height: 100%;
+                overflow-y: scroll;
+                text-align: center;
+            }
+            
+            .column.main {
+                width: 80%;
+            }
+            
+            .column.imageView {
+                /* position: absolute;
+                width: 1px;
+                text-align: center;
+                z-index: 1; */
+            }
+
+            .row:after {
+                content: "";
+                display: table;
+                clear: both;
+            }
+
+            .image {
+                padding: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- <div class="header">
+            <h1>데이터 제작기</h1>
+        </div> -->
+        <div class="row">
+            <div class="column side" id="imageList">
+
+            </div>
+            
+            <div class="column main" id="toolBox">
+                <div class="row">
+                    <div class="column imageView" id="imageView" hidden>
+                        
+                    </div>
+                    <div class="column bboxView" id="bboxView">
+
+                    </div>
+                    <canvas id="myCanvas">
+
+                    </canvas>
+                    <button onclick="eventConnector.exportcoord()" width="50px" height="30px">
+                        export!
+                    </button>
+                </div>
+            </div>
+        </div>
+        <script>
+            const {ipcRenderer} = require('electron');
+            
+            var main;
+            
+            var eventConnector = (function(){
+                var connector = {
+                    setxy(evt){
+                        main.setxy(evt);
+                    },
+                    exportcoord(evt){
+                        main.exportcoord();
+                    },
+                    keypressed(evt){
+                        console.log(evt.key);
+                        if (evt.key == 'e' || evt.key == 'E' ){
+                            main.exportcoord();
+                        }
+                    }
+                }
+                return connector;
+            })();
+
+            class Coord{
+                constructor (x=0, y=0) {
+                    this.x = x;
+                    this.y = y;
+                    
+                    this.setCallBack();
+                }
+
+                setCallBack () {
+
+                }
+            }
+
+            class Canvas{
+                constructor () {
+                    this.coord = [new Coord(), new Coord(), new Coord(), new Coord()];
+                    this.canvas = document.getElementById('myCanvas');
+                    console.log('canvas: ', this.canvas);
+                    this.ctx = this.canvas.getContext('2d');
+                    this.setCallBack();
+                    this.coordNum = 0;
+                    this.color = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF'];
+                }
+                
+                exportcoord(fileName){
+                    let text = '';
+                    for(let i = 0; i < this.coord.length; i++){
+                        text += `${this.coord[i].x} ${this.coord[i].y} `;
+                    }
+                    let landmarks = {fileName: fileName, landmarks: text};
+                    console.log('exportcoord', landmarks);
+                    ipcRenderer.send('saveLandmarks', landmarks)
+                }
+
+                drawImageOnCanvas(){
+                    let img = document.getElementById('imageViewImage');
+                    this.canvas.width = img.width;
+                    this.canvas.height = img.height;
+                    this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                    this.coordNum = 0;
+                }
+
+                drawPoint (pointIdx) {
+                    this.ctx.fillStyle = this.color[pointIdx];
+                    this.ctx.fillRect(this.coord[pointIdx].x, this.coord[pointIdx].y, 3, 3);
+                    this.ctx.stroke();
+                }
+                
+                drawPoints () {
+                    for(let i = 0; i < this.coord.length; i++){
+                        this.drawPoint(i);
+                    }
+                }
+
+                setxy (evt) {
+                    if (this.coordNum == 0){
+                        this.drawImageOnCanvas();
+                    }
+                    let rect = this.canvas.getBoundingClientRect();
+                    this.coord[this.coordNum].x = evt.clientX - rect.left;
+                    this.coord[this.coordNum].y = evt.clientY - rect.top;
+                    console.log(this.coord[this.coordNum].x, this.coord[this.coordNum].y);
+                    this.drawPoint(this.coordNum);
+
+                    // update coordNum
+                    this.coordNum += 1;
+                    if (this.coordNum >= this.coord.length) {
+                        this.coordNum = 0;
+                    }
+                }   
+
+                setCallBack () {
+                    ipcRenderer.on('setLandmark', (evt, msg) => {
+                        console.log(msg);
+                        let toks = msg.trim().split(' ');
+                        for(let i = 0; i < toks.length; i+=2){
+                            this.coord[Math.floor(i/2)].x = toks[i];
+                            this.coord[Math.floor(i/2)].y = toks[i + 1];
+                        }
+
+                        let rect = this.canvas.getBoundingClientRect();
+                        this.drawImageOnCanvas();
+                        this.drawPoints();
+                    });
+                    this.canvas.addEventListener('mousedown', eventConnector.setxy, false);
+                }
+            }
+            
+            class Main {
+                constructor () {
+                    this.canvas = new Canvas();
+                    this.rootDir = '';
+                    this.setCallBack();
+                    this.openFolder();
+                    this.fileName;
+                }
+
+                exportcoord () {
+                    console.log('asdasd', this.fileName);
+                    this.canvas.exportcoord(this.fileName);
+                }
+
+                openFolder () {
+                    ipcRenderer.send('openFolder');
+                }
+
+                setImageView (fileFullName) {
+                    let imageView = document.getElementById('imageView');
+                    imageView.innerHTML = `<img id="imageViewImage" `+
+                        `src="${this.rootDir}/images/${fileFullName}"`+
+                        `>`;
+                    this.canvas.drawImageOnCanvas();
+                    this.fileName = fileFullName.split('.')[0]
+                    ipcRenderer.send('getLandmark', this.fileName);
+                }
+                
+                setxy (evt) {
+                    this.canvas.setxy(evt);
+                }   
+                
+                setCallBack () {
+                    ipcRenderer.on('setImageList', (evt, msg) => {
+                        console.log(msg.files);
+                        let imageList = document.getElementById('imageList')
+                        for(let fileFullName of msg.files){
+                            name = fileFullName.split('.')[0];
+                            imageList.innerHTML += `<div class="image" id="${name}" ` +
+                                `onclick="main.setImageView('${fileFullName}')" ` + 
+                                `style="background-color:red;"> ` +
+                                `<img src="${this.rootDir}/images/${fileFullName}" ` +
+                                `width="33%" ` +
+                                '><br></div>';
+                        }
+                        ipcRenderer.send('getDoneList');
+                    });
+
+                    ipcRenderer.on('setDoneList', (evt, msg) => {
+                        console.log(msg.dir);
+                        for (let fileName of msg.dir) {
+                            let image = document.getElementById(fileName);
+                            image.setAttribute('style', 'background-color:green;');
+                        }
+                    });
+
+                    ipcRenderer.on('setRootDir', (evt, dirPath) => {
+                        console.log('On setRootDir', dirPath);
+                        this.rootDir = dirPath;
+                    })
+                }
+            }
+
+            function setMain (evt) {
+                window.removeEventListener(evt.type, setMain, false);
+                main = new Main();
+            }
+            
+            window.addEventListener('load', setMain, false);
+            window.addEventListener('keydown', eventConnector.keypressed, false);
+        </script>
+    </body>
+</html>

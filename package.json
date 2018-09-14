@@ -1,0 +1,66 @@
+{
+  "build": {
+    "productName": "tool",
+    "appId": "com.kevin970401.landmarkdataset",
+    "asar": false,
+    "protocols": {
+      "name": "tool",
+      "schemes": [
+        "tool"
+      ]
+    },
+    "mac": {
+      "target": [
+        "default"
+      ],
+      "icon": "./resources/installer/Icon.icns"
+    },
+    "dmg": {
+      "title": "tool",
+      "icon": "./resources/installer/Icon.icns"
+    },
+    "win": {
+      "target": [
+        "zip",
+        "nsis"
+      ],
+      "icon": "./resources/installer/Icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm",
+        "zip",
+        "tar.gz"
+      ],
+      "icon": "./resources/linuxicon"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "directories": {
+      "buildResources": "resources/installer/",
+      "output": "dist/",
+      "app": "."
+    }
+  },
+  "name": "label-app",
+  "version": "1.0.0",
+  "description": "tool for making landmark dataset",
+  "main": "index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:win64": "build --win --x64"
+  },
+  "author": "kevin970401",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^2.0.8",
+    "electron-builder": "^20.28.4"
+  },
+  "dependencies": {
+  }
+}
